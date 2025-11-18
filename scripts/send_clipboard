@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+# Get device IDs via D-Bus
+mapfile -t ids < <(qdbus org.kde.kdeconnect /modules/kdeconnect devices)
+[ ${#ids[@]} -eq 0 ] && notify-send "KDE Connect" "No devices found." && exit 1
+
+# Build "name|id" pairs
+devices=()
+for id in "${ids[@]}"; do
+    name=$(qdbus org.kde.kdeconnect "/modules/kdeconnect/devices/$id" org.kde.kdeconnect.device.name 2>/dev/null)
+    paired=$(qdbus org.kde.kdeconnect "/modules/kdeconnect/devices/$id" org.kde.kdeconnect.device.isPaired 2>/dev/null)
+    reachable=$(qdbus org.kde.kdeconnect "/modules/kdeconnect/devices/$id" org.kde.kdeconnect.device.isReachable 2>/dev/null)
+    if [[ "$paired" == "true" && "$reachable" == "true" ]]; then
+        devices+=("$name|$id")
+    fi
+done
+
+[ ${#devices[@]} -eq 0 ] && notify-send "KDE Connect" "No paired & reachable devices." && exit 1
+
+# Multi-select with rofi
+chosen=$(printf "%s\n" "${devices[@]}" | cut -d'|' -f1 | \
+    rofi -dmenu -theme ~/.config/rofi/launchers/type-2/style-1.rasi -multi-select -p "Send clipboard to:")
+
+[ -z "$chosen" ] && exit 0
+
+# Send clipboard to each selected device (bulletproof)
+while IFS='|' read -r dev_name dev_id; do
+    # Loop over selected names
+    printf "%s\n" "$chosen" | while IFS= read -r sel_name; do
+        if [[ "$dev_name" == "$sel_name" ]]; then
+            echo "Sending clipboard to $dev_name ($dev_id)"
+            kdeconnect-cli --send-clipboard -d "$dev_id"
+        fi
+    done
+done <<< "$(printf "%s\n" "${devices[@]}")"
+
+notify-send "KDE Connect" "Clipboard sent to: $chosen"
+
