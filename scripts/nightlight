@@ -1,0 +1,31 @@
+#!/bin/bash
+
+LAST_NOTIFICATION_ID_FILE="/run/user/$UID/wlsunset_notify_id"
+
+send_notify() {
+    local last_id
+    last_id=$(cat "$LAST_NOTIFICATION_ID_FILE" 2>/dev/null || echo "0")
+
+    local new_id
+    new_id=$(notify-send "$@" --replace-id="$last_id" --print-id)
+
+    echo "$new_id" > "$LAST_NOTIFICATION_ID_FILE"
+}
+
+enable_nightlight() {
+    nohup wlsunset -l 27.7017 -L 85.3206 >/dev/null 2>&1 &
+    disown
+    send_notify -u low "Night Light Enabled" "wlsunset is now active." -i weather-clear-night -t 2000
+}
+
+disable_nightlight() {
+    pkill -x wlsunset
+    send_notify -u normal "Night Light Disabled" "wlsunset has been stopped." -i weather-clear -t 2000
+}
+
+if pgrep -x wlsunset > /dev/null; then
+    disable_nightlight
+else
+    enable_nightlight
+fi
+
