@@ -39,3 +39,5 @@ wl-paste --watch cliphist store &
 # easyeffects --gapplication-service &
 nm-applet &
 libinput-gestures &
+
+EMOJI_FONT="Twemoji" vicinae server &
